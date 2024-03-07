@@ -1,50 +1,70 @@
-import fs from "fs";
-import stream from "stream";
-import S3 from "aws-sdk/clients/s3.js";
-import { FileService } from "medusa-interfaces";
+import fs from 'fs';
+import stream from 'stream';
+import path from 'path';
+import S3 from 'aws-sdk/clients/s3.js';
+import { AbstractFileService } from '@medusajs/medusa';
+import type {
+  DeleteFileType,
+  FileServiceGetUploadStreamResult,
+  FileServiceUploadResult,
+  GetUploadedFileType,
+  UploadStreamDescriptorType,
+} from '@medusajs/types';
 
-interface File {
-  path: string;
-  originalname: string;
-}
-
-interface FileData {
-  ext: string;
-  name: string;
-  fileKey: string;
-}
-
-interface Options {
-  bucket: string;
-  account_id: string;
-  access_key: string;
-  secret_key: string;
-  public_url: string;
-}
-
-class R2StorageService extends FileService {
+class R2StorageService extends AbstractFileService {
   bucket: string;
   endpoint: string;
-  account_id: string;
   access_key: string;
   secret_key: string;
   public_url: string;
+  cache_control: string;
+  presigned_url_expires: number;
 
-  constructor({}, options: Options) {
-    super();
+  constructor(
+    container: Record<string, unknown>,
+    options: Record<string, unknown>,
+  ) {
+    super(container, options);
+
+    if (typeof options.bucket !== 'string' || !options.bucket) {
+      throw new Error('R2StorageService requires a bucket');
+    }
+
+    if (typeof options.endpoint !== 'string' || !options.endpoint) {
+      throw new Error('R2StorageService requires an endpoint');
+    }
+
+    if (typeof options.access_key !== 'string' || !options.access_key) {
+      throw new Error('R2StorageService requires an access_key');
+    }
+
+    if (typeof options.secret_key !== 'string' || !options.secret_key) {
+      throw new Error('R2StorageService requires a secret_key');
+    }
+
+    if (typeof options.public_url !== 'string' || !options.public_url) {
+      throw new Error('R2StorageService requires a public_url');
+    }
 
     this.bucket = options.bucket;
-    this.account_id = options.account_id;
+    this.endpoint = options.endpoint;
     this.access_key = options.access_key;
     this.secret_key = options.secret_key;
     this.public_url = options.public_url;
-    this.endpoint = `https://${this.account_id}.r2.cloudflarestorage.com`;
+    this.cache_control =
+      typeof options.cache_control === 'string'
+        ? options.cache_control
+        : 'max-age=31536000';
+    this.presigned_url_expires =
+      typeof options.presigned_url_expires === 'number'
+        ? options.presigned_url_expires
+        : 60 * 60;
   }
 
   storageClient() {
     const client = new S3({
-      region: "auto",
-      signatureVersion: "v4",
+      region: 'auto',
+      signatureVersion: 'v4',
       endpoint: this.endpoint,
       accessKeyId: this.access_key,
       secretAccessKey: this.secret_key,
@@ -53,13 +73,23 @@ class R2StorageService extends FileService {
     return client;
   }
 
-  async uploadFile(file: File) {
+  private async uploadFile(
+    fileData: Express.Multer.File,
+    isPrivate?: boolean,
+  ): Promise<FileServiceUploadResult> {
     const client = this.storageClient();
 
-    const params = {
+    const parsedFilename = path.parse(fileData.originalname);
+
+    const fileKey = `${parsedFilename.name}-${Date.now()}${parsedFilename.ext}`;
+
+    const params: S3.PutObjectRequest = {
+      ACL: isPrivate ? 'private' : 'public-read',
       Bucket: this.bucket,
-      Key: file.originalname,
-      Body: fs.createReadStream(file.path),
+      Key: fileKey,
+      Body: fs.createReadStream(fileData.path),
+      ContentType: fileData.mimetype,
+      CacheControl: this.cache_control,
     };
 
     try {
@@ -71,37 +101,41 @@ class R2StorageService extends FileService {
       };
     } catch (err) {
       console.error(err);
-      throw new Error("An error occurred while uploading the file.");
+      throw new Error('An error occurred while uploading the file.');
     }
   }
 
-  // @ts-ignore This interface type is incorrect
-  async upload(file: File) {
-    return this.uploadFile(file);
+  async upload(
+    fileData: Express.Multer.File,
+  ): Promise<FileServiceUploadResult> {
+    return this.uploadFile(fileData);
   }
 
-  async uploadProtected(file: File) {
-    return this.uploadFile(file);
+  async uploadProtected(
+    fileData: Express.Multer.File,
+  ): Promise<FileServiceUploadResult> {
+    return this.uploadFile(fileData, true);
   }
 
-  // @ts-ignore This interface type is incorrect
-  async delete(file: string) {
+  async delete(fileData: DeleteFileType): Promise<void> {
     const client = this.storageClient();
 
     const params = {
       Bucket: this.bucket,
-      Key: `${file}`,
+      Key: fileData.fileKey,
     };
 
     try {
       await client.deleteObject(params).promise();
     } catch (err) {
       console.error(err);
-      throw new Error("An error occurred while deleting the file.");
+      throw new Error('An error occurred while deleting the file.');
     }
   }
 
-  async getDownloadStream(fileData: FileData) {
+  async getDownloadStream(
+    fileData: GetUploadedFileType,
+  ): Promise<NodeJS.ReadableStream> {
     const client = this.storageClient();
 
     const params = {
@@ -113,36 +147,46 @@ class R2StorageService extends FileService {
       return client.getObject(params).createReadStream();
     } catch (err) {
       console.error(err);
-      throw new Error("An error occurred while downloading the file.");
+      throw new Error('An error occurred while downloading the file.');
     }
   }
 
-  async getPresignedDownloadUrl(fileData: FileData) {
+  async getPresignedDownloadUrl(
+    fileData: GetUploadedFileType,
+  ): Promise<string> {
     const client = this.storageClient();
 
     const params = {
       Bucket: this.bucket,
       Key: fileData.fileKey,
-      Expires: 60 * 60, // 1 hour
+      Expires: this.presigned_url_expires,
     };
 
     try {
-      return client.getSignedUrlPromise("getObject", params);
+      return client.getSignedUrlPromise('getObject', params);
     } catch (err) {
       console.error(err);
-      throw new Error("An error occurred while downloading the file.");
+      throw new Error('An error occurred while downloading the file.');
     }
   }
 
-  async getUploadStreamDescriptor(fileData: FileData) {
+  async getUploadStreamDescriptor(
+    fileData: UploadStreamDescriptorType,
+  ): Promise<FileServiceGetUploadStreamResult> {
     const client = this.storageClient();
     const pass = new stream.PassThrough();
     const fileKey = `${fileData.name}.${fileData.ext}`;
+    const isPrivate = fileData.isPrivate ?? true;
 
-    const params = {
+    const params: S3.PutObjectRequest = {
+      ACL: isPrivate ? 'private' : 'public-read',
+      Bucket: this.bucket,
       Body: pass,
       Key: fileKey,
-      Bucket: this.bucket,
+      ContentType:
+        typeof fileData.contentType === 'string'
+          ? fileData.contentType
+          : 'application/octet-stream',
     };
 
     return {

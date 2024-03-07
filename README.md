@@ -28,11 +28,14 @@ This plugin is written in Typescript and uses ESBuild to create the bundle and f
      {
        resolve: "medusa-file-r2",
        options: {
-         account_id: "YOUR_ACCOUNT_ID",
+         bucket: "YOUR_R2_BUCKET_NAME",
+         endpoint: "https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com",
          access_key: "YOUR_ACCESS_KEY",
          secret_key: "YOUR_SECRET_KEY",
-         bucket: "YOUR_R2_BUCKET_NAME",
          public_url: "YOUR_R2_BUCKET_PUBLIC_URL",
+         // Optional options
+         // cache_control: "max-age=31536000",
+         // presigned_url_expires: 60 * 60, // 1 hour
        },
      },
    ];
