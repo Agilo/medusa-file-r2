@@ -1,19 +1,17 @@
 {
-  "name": "medusa-file-r2",
-  "version": "0.0.2",
+  "name": "@agilo/medusa-file-r2",
+  "version": "1.0.0",
   "description": "Cloudflare R2 storage plugin for Medusa",
-  "author": "Yinka Adedire <yinkakun@gmail.com>",
+  "author": "Ante Primorac <ante@agilo.co>",
   "license": "MIT",
   "scripts": {
     "bundle": "esbuild src/services/** --outdir=services --format=cjs --target=esnext",
-    "dev": "yarn bundle --watch",
-    "build": "yarn bundle",
-    "prepare": "yarn build",
-    "package": "yarn build && yarn np --no-tests --no-yarn"
+    "dev": "npm run bundle -- --watch",
+    "build": "npm run bundle"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yinkakun/medusa-file-r2.git"
+    "url": "https://github.com/Agilo/medusa-file-r2.git"
   },
   "files": [
     "services"
