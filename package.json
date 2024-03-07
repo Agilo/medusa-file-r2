@@ -1,6 +1,6 @@
 {
   "name": "@agilo/medusa-file-r2",
-  "version": "1.0.0",
+  "version": "0.0.3",
   "description": "Cloudflare R2 storage plugin for Medusa",
   "author": "Ante Primorac <ante@agilo.co>",
   "license": "MIT",
