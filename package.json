@@ -43,5 +43,8 @@
     "medusa-plugin",
     "medusa-file-plugin",
     "cloudflare-r2"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
