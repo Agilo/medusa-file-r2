@@ -81,7 +81,9 @@ class R2StorageService extends AbstractFileService {
 
     const parsedFilename = path.parse(fileData.originalname);
 
-    const fileKey = `${encodeURIComponent(parsedFilename.name)}-${Date.now()}${parsedFilename.ext}`;
+    const timestamp = Date.now();
+    const fileKey = `${parsedFilename.name}-${timestamp}${parsedFilename.ext}`;
+    const encodedFileKey = `${encodeURIComponent(parsedFilename.name)}-${timestamp}${parsedFilename.ext}`;
 
     const params: S3.PutObjectRequest = {
       ACL: isPrivate ? 'private' : 'public-read',
@@ -96,7 +98,7 @@ class R2StorageService extends AbstractFileService {
       const data = await client.upload(params).promise();
 
       return {
-        url: `${this.public_url}/${data.Key}`,
+        url: `${this.public_url}/${encodedFileKey}`,
         key: data.Key,
       };
     } catch (err) {
