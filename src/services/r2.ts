@@ -81,7 +81,7 @@ class R2StorageService extends AbstractFileService {
 
     const parsedFilename = path.parse(fileData.originalname);
 
-    const fileKey = `${parsedFilename.name}-${Date.now()}${parsedFilename.ext}`;
+    const fileKey = `${encodeURIComponent(parsedFilename.name)}-${Date.now()}${parsedFilename.ext}`;
 
     const params: S3.PutObjectRequest = {
       ACL: isPrivate ? 'private' : 'public-read',
